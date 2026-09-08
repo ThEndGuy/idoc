@@ -55,8 +55,8 @@ if (!idoc_tuple_get(&idoc, double, red, "program", "COLORS", "red") exit(1);
 idoc_free(&idoc);
 // Your program here that uses name and red
 // ...
-free(red)
-free(name) // Since the string lives after idoc_free, it must be manually freed
+free(red);
+free(name); // Since the string lives after idoc_free, it must be manually freed
 ```
 
 The full explanation of the API is given inside [idoc.h](./idoc.h).
