@@ -855,7 +855,7 @@ Idoc idoc_init(const char *file_name) {
     Idoc_SB sb = {0};
     if (!idoc_read_entire_file(file_name, &sb)) {
         ret.is_valid = false;
-        return ret
+        return ret;
     }
     Idoc_SV sv = {
         .data = sb.items,
