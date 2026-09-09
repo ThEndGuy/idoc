@@ -28,12 +28,12 @@
 typedef struct Idoc Idoc;
 
 // You start by parsing the file using idoc_init
-Idoc idoc_init(const char *file_name);
-// Make sure to check if its valid!! The file can fail to read.
+Idoc *idoc_init(const char *file_name);
+// Make sure to check if its valid (!= NULL)!! The file can fail to read.
 // Example:
 #if 0
-    Idoc idoc = idoc_init("filename");
-    if (!idoc.is_valid) exit(1); // or do whatever you want here
+    Idoc *idoc = idoc_init("filename");
+    if (idoc == NULL) exit(1); // or do whatever you want here
 #endif
 
 // Suppose your .idoc file looks like this:
@@ -44,7 +44,7 @@ Idoc idoc_init(const char *file_name);
 // To get the program name, you use the corresponding function
 // Example:
 #if 0
-    char *name = idoc_get_cstr(&idoc, "default_name", "Program", "Name", NULL);
+    char *name = idoc_get_cstr(idoc, "default_name", "Program", "Name", NULL);
 #endif
 // Notice how we get the string by tracing out the nested path to what we want,
 // and terminate it by NULL.
@@ -75,7 +75,7 @@ char        *idoc_get_cstr(Idoc *idoc, const char *def_str, ...);
 // Example:
 #if 0
     int color[3];
-    idoc_get_tuple_int(&idoc, color, 3, "Program", "Palette", "Color", NULL);
+    idoc_get_tuple_int(idoc, color, 3, "Program", "Palette", "Color", NULL);
 #endif
 // Note that we must pass the capacity of the array using this function,
 // and again, pass the NULL as the last value.
@@ -103,9 +103,9 @@ void idoc_free(Idoc *idoc);
 // We can get the same information as before as following:
 // Example:
 #if 0
-    char *name = idoc_get(&idoc, cstr, "default_name", "Program", "Name")
+    char *name = idoc_get(idoc, cstr, "default_name", "Program", "Name")
     int color[3];
-    idoc_get_tuple_int(&idoc, color, "Program", "Palette", "Color");
+    idoc_get_tuple(idoc, int, color, "Program", "Palette", "Color");
 #endif
 // Using macros, you dont need to pass the last NULL, nor pass the size of the
 // array.
@@ -307,7 +307,6 @@ typedef struct {
 struct Idoc {
     Idoc_Node root;
     Idoc_SB __file_content;
-    bool is_valid;
 };
 
 bool idoc_read_entire_file(const char *path, Idoc_SB *sb) {
@@ -451,9 +450,9 @@ int sv_to_int(Idoc_SV sv) {
 }
 
 double sv_to_double(Idoc_SV sv) {
-    double sign = 1.0f;
-    double result = 0.0f;
-    double fractional = 0.1f;
+    double sign = 1.0;
+    double result = 0.0;
+    double fractional = 0.1;
     size_t i = 0;
     if (sv.count > 0 && sv.data[0] == '-') { // Negative number
         sign = -1;
@@ -850,12 +849,14 @@ void value_print(Idoc_Value *value) {
 }
 
 
-Idoc idoc_init(const char *file_name) {
-    Idoc ret = {0};
+Idoc *idoc_init(const char *file_name) {
+    Idoc *idoc = malloc(sizeof(*idoc));
+    if (idoc == NULL) return NULL;
     Idoc_SB sb = {0};
     if (!idoc_read_entire_file(file_name, &sb)) {
-        ret.is_valid = false;
-        return ret;
+        free(sb.items);
+        free(idoc);
+        return NULL;
     }
     Idoc_SV sv = {
         .data = sb.items,
@@ -863,10 +864,9 @@ Idoc idoc_init(const char *file_name) {
     };
     Idoc_Parser p = parser_init(sv, file_name);
     Idoc_Node n = parse_block(&p, 0);
-    ret.root = n;
-    ret.__file_content = sb;
-    ret.is_valid = true;
-    return ret;
+    idoc->root = n;
+    idoc->__file_content = sb;
+    return idoc;
 }
 
 Idoc_Value *idoc_resolve_value(Idoc *idoc, Idoc_Value *value) {
@@ -1055,10 +1055,11 @@ bool idoc_get_tuple_double(Idoc *idoc, double *out, size_t capacity, ...) {
     if (value->tuple.count != capacity) {return false;}
 
     for (size_t i = 0; i < value->tuple.count; i++) {
-        if (value->tuple.items[i].type != VALUE_FLOAT) {
-            return false;
-        }
-        out[i] = value->tuple.items[i].floating;
+        if (value->tuple.items[i].type == VALUE_FLOAT) {
+            out[i] = value->tuple.items[i].floating;
+        } else if (value->tuple.items[i].type == VALUE_INTEGER) {
+            out[i] = (double)value->tuple.items[i].integer;
+        } else return false;
     }
     return true;
 }
@@ -1128,8 +1129,10 @@ void node_free(Idoc_Node *node) {
 }
 
 void idoc_free(Idoc *idoc) {
+    if (idoc == NULL) return;
     node_free(&idoc->root);
     free(idoc->__file_content.items);
+    free(idoc);
 }
 
 
