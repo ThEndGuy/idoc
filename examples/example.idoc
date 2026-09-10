@@ -1,5 +1,5 @@
+Name =      "Music Player"        
 Program:
-  Name =      "Music Player"        
   Resolution:     
     height =   Program.Resolution.width
     width =    800

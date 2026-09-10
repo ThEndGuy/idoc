@@ -518,7 +518,6 @@ bool lexer_check_whitespace(Lexer *l, Idoc_whitespace_type ws, size_t length) {
     if (!l->at_start) {
         return false;
     }
-    l->at_start = false;
     if (l->exp_ind.type != WS_UNSET) {
         if (l->exp_ind.type != ws || length % l->exp_ind.count != 0) {
             return false;
@@ -568,6 +567,7 @@ Idoc_Token lexer_next_token(Lexer *l) {
             }
         }
     }
+    l->at_start = false;
     length = 0;
     const char *start = l->sv.data;
     if (isdigit(c)) {
@@ -814,7 +814,7 @@ Idoc_Node parse_block(Idoc_Parser *p, int indent_level) {
             sub_n.value = parse_value(p, sub_n, var);
             da_append(&n, sub_n);
         } else {
-            error(p->lexer.file, p->lexer.loc.line, p->lexer.loc.col, "Unknown token: %s ("SV_FMT")", token_by_name(t.type), SV_ARG(t.sv));
+            error(p->lexer.file, p->lexer.loc.line, p->lexer.loc.col, "Parser: Invalid token: %s ("SV_FMT")", token_by_name(next.type), SV_ARG(next.sv));
         }
     }
     return n;
