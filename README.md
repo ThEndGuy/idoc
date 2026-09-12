@@ -30,7 +30,7 @@ You can define *Sections* by using a name followed by a ":", such as the `Progra
 
 You can define an *Assignment* by using a name followed by a "=", such as the `Name = "Program name"` in the example.
 
-Idoc files support 4 types of assignments, `int`, `double`, `string` and `reference`.
+Idoc files support 5 types of assignments, `bool`, `int`, `double`, `string` and `reference`.
 A reference is just the full path to another assignment, split by ".", such as the `cool_number = Program.width` example.
 You can reference a future assignment (a.k.a defined later).
 
@@ -60,3 +60,7 @@ free(name); // Since the string lives after idoc_free, it must be manually freed
 ```
 
 The full explanation of the API is given inside [idoc.h](./idoc.h).
+
+## Emacs mode
+
+A incredibly simple syntax highlighter is also provided for editing .idoc files (idoc-mode.el). Just source it in your emacs init file.
