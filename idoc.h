@@ -53,6 +53,7 @@ Idoc *idoc_init(const char *file_name);
 // default name will be used.
 //
 // You can use the following functions to get each type of field:
+bool   idoc_get_bool(Idoc *idoc, bool def_bool, ...);
 int    idoc_get_int(Idoc *idoc, int def_int, ...);
 double idoc_get_double(Idoc *idoc, double def_double, ...);
 // The user must manually free the cstring, IT IS NOT FREED BY idoc_free
@@ -83,6 +84,7 @@ char  *idoc_get_cstr(Idoc *idoc, const char *def_str, ...);
 // We define an easier more straightforward way of getting the same value
 // using macros below.
 // Here are the tuple functions:
+bool   idoc_get_tuple_bool(Idoc *idoc, bool *out, size_t out_size, ...);
 bool   idoc_get_tuple_int(Idoc *idoc, int *out, size_t out_size, ...);
 bool   idoc_get_tuple_double(Idoc *idoc, double *out, size_t out_size, ...);
 bool   idoc_get_tuple_cstr(Idoc *idoc, char **out, size_t out_size, ...);
@@ -111,7 +113,7 @@ void idoc_free(Idoc *idoc);
 // Using macros, you dont need to pass the last NULL, nor pass the size of the
 // array.
 // These are the intended ways to use this library!!!
-// Here are all the types idoc supports: int, double, cstr
+// Here are all the types idoc supports: bool, int, double, cstr
 #define idoc_get(idoc, type, def, ...) idoc_get_##type(idoc, def, __VA_ARGS__, NULL)
 #define idoc_get_tuple(idoc, type, out, ...) idoc_get_tuple_##type(idoc, out, IDOC_ARRAY_LEN(out), __VA_ARGS__, NULL)
 
@@ -121,10 +123,12 @@ void idoc_free(Idoc *idoc);
 // more niche uses. You should probably stick to the ones above (specifically the macros)
 
 
+bool idoc_get_bool_arr(Idoc *idoc, bool def_bool, const char **path, size_t path_size);
 int idoc_get_int_arr(Idoc *idoc, int def_int, const char **path, size_t path_size);
 double idoc_get_double_arr(Idoc *idoc, double def_double, const char **path, size_t path_size);
 char *idoc_get_cstr_arr(Idoc *idoc, const char *def_str, const char **path, size_t path_size);
 
+bool idoc_get_tuple_bool_arr(Idoc *idoc, bool *out, size_t out_size, const char **path, size_t path_size);
 bool idoc_get_tuple_int_arr    (Idoc *idoc, int *out, size_t out_size, const char **path, size_t path_size);
 bool idoc_get_tuple_double_arr (Idoc *idoc, double *out, size_t out_size, const char **path, size_t path_size);
 bool idoc_get_tuple_cstr_arr   (Idoc *idoc, char **out, size_t out_size, const char **path, size_t path_size);
@@ -275,6 +279,7 @@ typedef enum {
     VALUE_INTEGER,
     VALUE_FLOAT,
     VALUE_TUPLE,
+    VALUE_BOOL,
     VALUE_REFERENCE,
 } Idoc_Value_Type;
 
@@ -293,6 +298,7 @@ struct Idoc_Value {
         Idoc_SV string;
         int integer;
         double floating;
+        bool boolean;
         struct {
             Idoc_SV *items;
             size_t count;
@@ -570,6 +576,7 @@ Idoc_Token lexer_next_token(Lexer *l) {
     l->at_start = false;
     length = 0;
     const char *start = l->sv.data;
+
     if (isdigit(c)) {
         Idoc_Token_Type tt = TOKEN_INT;
         while (true) {
@@ -584,6 +591,7 @@ Idoc_Token lexer_next_token(Lexer *l) {
         l->loc.col += length;
         Idoc_SV number = {.data = start, .count = length};
         return (Idoc_Token){.type = tt, .sv = number};
+
     } else if (c == '-' && isdigit(l->sv.data[1])) { // The next must be a number
         Idoc_Token_Type tt = TOKEN_INT;
         while (true) {
@@ -599,6 +607,7 @@ Idoc_Token lexer_next_token(Lexer *l) {
         Idoc_SV number = {.data = start, .count = length};
         return (Idoc_Token){.type = tt, .sv = number};
     }
+
     if (isalpha(c)) {
         while (true) {
             sv_chop_left(&l->sv, 1);
@@ -613,6 +622,7 @@ Idoc_Token lexer_next_token(Lexer *l) {
         };
         l->loc.col += length;
         return (Idoc_Token){.type = TOKEN_VAR, .sv = variable};
+
     } else if (c == '=') {
         length += 1;
         sv_chop_left(&l->sv, 1);
@@ -748,14 +758,22 @@ Idoc_Value parse_value(Idoc_Parser *p, Idoc_Node node, Idoc_Token token) {
         node.value.floating = sv_to_double(token.sv);
         node.value.type = VALUE_FLOAT;
     } break;
-    case TOKEN_VAR: { // GLOBAL REFERENCE
-        parser_expect(p, TOKEN_DOT);
-        da_append(&node.value.ref, token.sv);
-        while (true) {
-            Idoc_Token v = parser_expect(p, TOKEN_VAR);
-            da_append(&node.value.ref, v.sv);
-            if (parser_consume(p).type != TOKEN_DOT) break;
-        node.value.type = VALUE_REFERENCE;
+    case TOKEN_VAR: { // GLOBAL REFERENCE OR BOOLEAN
+        if (sv_eq(token.sv, cstr_to_sv("true"))) {
+            node.value.boolean = true;
+            node.value.type = VALUE_BOOL;
+        } else if (sv_eq(token.sv, cstr_to_sv("false"))) {
+            node.value.boolean = false;
+            node.value.type = VALUE_BOOL;
+        } else {
+            parser_expect(p, TOKEN_DOT);
+            da_append(&node.value.ref, token.sv);
+            while (true) {
+                Idoc_Token v = parser_expect(p, TOKEN_VAR);
+                da_append(&node.value.ref, v.sv);
+                if (parser_consume(p).type != TOKEN_DOT) break;
+            node.value.type = VALUE_REFERENCE;
+            }
         }
     } break;
     case TOKEN_DOT: { // LOCAL REFERENCE
@@ -909,6 +927,52 @@ Idoc_Node *idoc_find_path(Idoc *idoc, const char **path, size_t path_size) {
     return current;
 }
 
+bool idoc_get_bool_arr(Idoc *idoc, bool def_bool, const char **path,
+                     size_t path_size) {
+    Idoc_Node *current = idoc_find_path(idoc, path, path_size);
+    char *def_bool_str = def_bool ? "true" : "false";
+    if (current == NULL) {
+        IDOC_WARN("Using default (%s)\n", def_bool_str);
+        return def_bool;
+    }
+
+    Idoc_Value *value = idoc_resolve_value(idoc, &current->value);
+    if (value == NULL) {
+        IDOC_WARN("Warning: Invalid reference\nUsing default (%s)\n", def_bool_str); // TODO: add line num logic to this
+        return def_bool;
+    } else if (value->type != VALUE_BOOL) {
+        IDOC_WARN("Warning: Invalid type\nUsing default (%s)\n", def_bool_str); // TODO: add line num logic to this
+        return def_bool;
+    }
+    return value->boolean;
+}
+
+bool idoc_get_bool(Idoc *idoc, bool def_bool, ...) {
+    va_list args;
+    va_start(args, def_bool);
+    size_t count = 0;
+    const char *part;
+    while (va_arg(args, const char *) != NULL) {
+        count++;
+    }
+    va_end(args);
+    const char **path = malloc(count * sizeof(*path));
+    if (path == NULL && count != 0) {
+        fprintf(stderr, "No memory!!\n");
+        return def_bool;
+    }
+    va_start(args, def_bool);
+    for (size_t i = 0; i < count; i++) {
+        path[i] = va_arg(args, const char *);
+    }
+    va_end(args);
+
+    bool result = idoc_get_bool_arr(idoc, def_bool, path, count);
+    free(path);
+    return result;
+}
+
+
 int idoc_get_int_arr(Idoc *idoc, int def_int, const char **path,
                      size_t path_size) {
     Idoc_Node *current = idoc_find_path(idoc, path, path_size);
@@ -919,7 +983,7 @@ int idoc_get_int_arr(Idoc *idoc, int def_int, const char **path,
 
     Idoc_Value *value = idoc_resolve_value(idoc, &current->value);
     if (value == NULL) {
-        IDOC_WARN("Warning: Invalid reference\nUsing default (%d)\n"); // TODO: add line num logic to this
+        IDOC_WARN("Warning: Invalid reference\nUsing default (%d)\n", def_int); // TODO: add line num logic to this
         return def_int;
     } else if (value->type != VALUE_INTEGER) {
         IDOC_WARN("Warning: Invalid type\nUsing default (%d)\n", def_int); // TODO: add line num logic to this
@@ -946,6 +1010,7 @@ int idoc_get_int(Idoc *idoc, int def_int, ...) {
     for (size_t i = 0; i < count; i++) {
         path[i] = va_arg(args, const char *);
     }
+    va_end(args);
 
     int result = idoc_get_int_arr(idoc, def_int, path, count);
     free(path);
@@ -993,6 +1058,7 @@ double idoc_get_double(Idoc *idoc, double def_double, ...) {
     for (size_t i = 0; i < count; i++) {
         path[i] = va_arg(args, const char *);
     }
+    va_end(args);
 
     int result = idoc_get_double_arr(idoc, def_double, path, count);
     free(path);
@@ -1040,9 +1106,68 @@ char *idoc_get_cstr(Idoc *idoc, const char *def_str, ...) {
     for (size_t i = 0; i < count; i++) {
         path[i] = va_arg(args, const char *);
     }
+    va_end(args);
 
     char *result = idoc_get_cstr_arr(idoc, def_str, path, count);
     free(cp_def_str);
+    free(path);
+    return result;
+}
+
+bool idoc_get_tuple_bool_arr(Idoc *idoc, bool *out, size_t out_size,
+                            const char **path, size_t path_size) {
+    Idoc_Node *current = idoc_find_path(idoc, path, path_size);
+
+    if (current == NULL) {
+        return false;
+    }
+
+
+    Idoc_Value *value = idoc_resolve_value(idoc, &current->value);
+    if (value == NULL) {
+        IDOC_WARN("Warning: Invalid reference\n"); // TODO: add line num logic to this
+        return false;
+    } else if (value->type != VALUE_TUPLE) {
+        IDOC_WARN("Warning: Invalid type\n"); // TODO: add line num logic to this
+        return false;
+    }
+
+    if (value->tuple.count != out_size) {
+        fprintf(stderr, "ERROR: Invalid array size. Expected `%d` got `%d`\n", value->tuple.count, out_size);
+        return false;
+    }
+
+    for (size_t i = 0; i < value->tuple.count; i++) {
+        if (value->tuple.items[i].type != VALUE_BOOL) {
+            return false;
+        }
+        out[i] = value->tuple.items[i].boolean;
+    }
+    return true;
+}
+
+bool idoc_get_tuple_bool(Idoc *idoc, bool *out, size_t out_size, ...) {
+
+    va_list args;
+    va_start(args, out_size);
+    size_t count = 0;
+    const char *part;
+    while (va_arg(args, const char *) != NULL) {
+        count++;
+    }
+    va_end(args);
+    const char **path = malloc(count * sizeof(*path));
+    if (path == NULL && count != 0) {
+        fprintf(stderr, "No memory!!\n");
+        return false;
+    }
+    va_start(args, out_size);
+    for (size_t i = 0; i < count; i++) {
+        path[i] = va_arg(args, const char *);
+    }
+    va_end(args);
+
+    bool result = idoc_get_tuple_bool_arr(idoc, out, out_size, path, count);
     free(path);
     return result;
 }
@@ -1098,6 +1223,7 @@ bool idoc_get_tuple_int(Idoc *idoc, int *out, size_t out_size, ...) {
     for (size_t i = 0; i < count; i++) {
         path[i] = va_arg(args, const char *);
     }
+    va_end(args);
 
     bool result = idoc_get_tuple_int_arr(idoc, out, out_size, path, count);
     free(path);
@@ -1155,6 +1281,7 @@ bool idoc_get_tuple_double(Idoc *idoc, double *out, size_t out_size, ...) {
     for (size_t i = 0; i < count; i++) {
         path[i] = va_arg(args, const char *);
     }
+    va_end(args);
 
     bool result = idoc_get_tuple_double_arr(idoc, out, out_size, path, count);
     free(path);
@@ -1211,6 +1338,7 @@ bool idoc_get_tuple_cstr(Idoc *idoc, char **out, size_t out_size, ...) {
     for (size_t i = 0; i < count; i++) {
         path[i] = va_arg(args, const char *);
     }
+    va_end(args);
 
     bool result = idoc_get_tuple_cstr_arr(idoc, out, out_size, path, count);
     free(path);
