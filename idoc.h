@@ -852,29 +852,31 @@ Idoc_Node *node_find_child(Idoc_Node *parent, Idoc_SV key) {
 
 void value_print(Idoc_Value *value) {
     switch (value->type) {
+    case VALUE_EMPTY: {
+        printf("No value (empty)");
+    } break;
+    case VALUE_STRING: {
+        printf(SV_FMT, SV_ARG(value->string));
+    } break;
     case VALUE_INTEGER: {
         printf("%d", value->integer);
     } break;
     case VALUE_FLOAT: {
         printf("%.2f", value->floating);
     } break;
-    case VALUE_STRING: {
-        printf(SV_FMT, SV_ARG(value->string));
-    } break;
-    case VALUE_REFERENCE: {
-        printf("Printing references is not implemented yet");
-    } break;
     case VALUE_TUPLE: {
         printf("(");
-        // (Type, it, da) for (Type *it = (da)->items; it < (da)->items + (da)->count; ++it)
         for (size_t i = 0; i < value->tuple.count; i++) {
             value_print(&value->tuple.items[i]);
             if (i != value->tuple.count - 1) { printf(", "); }
         }
         printf(")");
     } break;
-    case VALUE_EMPTY: {
-        printf("No value");
+    case VALUE_BOOL: {
+        printf("%s", value->boolean ? "true" : "false");
+    } break;
+    case VALUE_REFERENCE: {
+        printf("Printing references is not implemented yet");
     } break;
     }
 }
@@ -1070,7 +1072,7 @@ char *idoc_get_cstr_arr(Idoc *idoc, const char *def_str, const char **path, size
     char *cp_def_str = cstr_copy(def_str);
 
     if (current == NULL) {
-        IDOC_WARN("Using default (%f)\n", def_str);
+        IDOC_WARN("Using default (%s)\n", def_str);
         return cp_def_str;
     }
 
@@ -1133,7 +1135,7 @@ bool idoc_get_tuple_bool_arr(Idoc *idoc, bool *out, size_t out_size,
     }
 
     if (value->tuple.count != out_size) {
-        fprintf(stderr, "ERROR: Invalid array size. Expected `%d` got `%d`\n", value->tuple.count, out_size);
+        fprintf(stderr, "ERROR: Invalid array size. Expected `%zu` got `%zu`\n", value->tuple.count, out_size);
         return false;
     }
 
@@ -1191,7 +1193,7 @@ bool idoc_get_tuple_int_arr(Idoc *idoc, int *out, size_t out_size,
     }
 
     if (value->tuple.count != out_size) {
-        fprintf(stderr, "ERROR: Invalid array size. Expected `%d` got `%d`\n", value->tuple.count, out_size);
+        fprintf(stderr, "ERROR: Invalid array size. Expected `%zu` got `%zu`\n", value->tuple.count, out_size);
         return false;
     }
 
@@ -1249,7 +1251,7 @@ bool idoc_get_tuple_double_arr(Idoc *idoc, double *out, size_t out_size,
     }
 
     if (value->tuple.count != out_size) {
-        fprintf(stderr, "ERROR: Invalid array size. Expected `%d` got `%d`\n", value->tuple.count, out_size);
+        fprintf(stderr, "ERROR: Invalid array size. Expected `%zu` got `%zu`\n", value->tuple.count, out_size);
         return false;
     }
 
@@ -1306,7 +1308,7 @@ bool idoc_get_tuple_cstr_arr(Idoc *idoc, char **out, size_t out_size,
     }
 
     if (value->tuple.count != out_size) {
-        fprintf(stderr, "ERROR: Invalid array size. Expected `%d` got `%d`\n", value->tuple.count, out_size);
+        fprintf(stderr, "ERROR: Invalid array size. Expected `%zu` got `%zu`\n", value->tuple.count, out_size);
         return false;
     }
 
