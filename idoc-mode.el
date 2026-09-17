@@ -17,6 +17,6 @@
     ))
 
 
-(add-to-list 'auto-mode-alist '("\\.idoc\\'" . 'idoc-mode))
+(add-to-list 'auto-mode-alist '("\\.idoc\\'" . idoc-mode))
 
 (provide 'idoc-mode)
