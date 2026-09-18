@@ -142,8 +142,6 @@ bool idoc_get_tuple_cstr_arr   (Idoc *idoc, char **out, size_t out_size, const c
 
 #endif // IDOC_H
 
-#define IDOC_IMPLEMENTATION // REMOVE THIS
-
 #ifdef IDOC_IMPLEMENTATION
 
 #ifndef IDOC_NO_WARNINGS
