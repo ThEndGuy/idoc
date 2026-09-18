@@ -142,6 +142,8 @@ bool idoc_get_tuple_cstr_arr   (Idoc *idoc, char **out, size_t out_size, const c
 
 #endif // IDOC_H
 
+#define IDOC_IMPLEMENTATION // REMOVE THIS
+
 #ifdef IDOC_IMPLEMENTATION
 
 #ifndef IDOC_NO_WARNINGS
@@ -786,8 +788,23 @@ Idoc_Value parse_value(Idoc_Parser *p, Idoc_Node node, Idoc_Token token) {
         node.value.type = VALUE_REFERENCE;
     } break;
     case TOKEN_OPAREN: {
+        bool multiline;
+        if (parser_peek(p).type == TOKEN_NL) {
+            multiline = true;
+            parser_expect(p, TOKEN_NL);
+            parser_expect(p, TOKEN_INDENT);
+        }
         while (true) {
+            if (p->current.type == TOKEN_NL) {
+                parser_expect(p, TOKEN_NL);
+                continue;
+            };
             da_append(&node.value.tuple, parse_value(p, node, parser_consume(p)));
+            if ((p->current.type == TOKEN_NL) && multiline) {
+                parser_expect(p, TOKEN_NL);
+                parser_expect(p, TOKEN_UNINDENT);
+                break;
+            }
             if (p->current.type == TOKEN_CPAREN) break;
             parser_expect(p, TOKEN_COMMA);
         }
@@ -796,7 +813,7 @@ Idoc_Value parse_value(Idoc_Parser *p, Idoc_Node node, Idoc_Token token) {
     } break;
     default: {
         error(p->lexer.file, p->lexer.loc.line, p->lexer.loc.col,
-              "Unknown token: %s ("SV_FMT")", token_by_name(token.type), SV_ARG(token.sv));
+              "parse_value: Unknown token: %s ("SV_FMT")", token_by_name(token.type), SV_ARG(token.sv));
     } break;
     }
     return node.value;

@@ -6,5 +6,8 @@ Program:
   Colors:
     background = (0.3, 1.6, 10, 255) # Tuple (R,G,B,A)
     foreground = (100, 0, 0, 255)
-    test = ("hi", "there")
+    test = (
+      "hi",
+      "there"
+    )
     test2 = true
