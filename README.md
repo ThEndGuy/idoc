@@ -37,7 +37,6 @@ Idoc files support 5 types of assignments, `bool`, `int`, `double`, `string` and
 A reference is just the full path to another assignment, split by ".", such as the `cool_number = Program.width` example.
 You can reference a future assignment (a.k.a defined later).
 
-Idoc idoc = idoc_init("./example.idoc");
 ## Using idoc.h
 ### Using it as a header-only library
 
@@ -64,7 +63,7 @@ Which will generate the lib `libidoc.a`.
 After setting it up, you start the parser, and get fields like so (lets use the idoc file defined in the example above):
 
 ```c main.c
-Idoc *idoc = idoc_init("path/to/file.idoc")
+Idoc *idoc = idoc_init("./example.idoc");
 char *name = idoc_get(idoc, cstr, "Program", "Name");
 double red[3];
 if (!idoc_tuple_get(idoc, double, red, "program", "COLORS", "red") exit(1);
