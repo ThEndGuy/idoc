@@ -772,8 +772,8 @@ Idoc_Value parse_value(Idoc_Parser *p, Idoc_Node node, Idoc_Token token) {
                 Idoc_Token v = parser_expect(p, TOKEN_VAR);
                 da_append(&node.value.ref, v.sv);
                 if (parser_consume(p).type != TOKEN_DOT) break;
-            node.value.type = VALUE_REFERENCE;
             }
+            node.value.type = VALUE_REFERENCE;
         }
     } break;
     case TOKEN_DOT: { // LOCAL REFERENCE
