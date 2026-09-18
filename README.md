@@ -19,7 +19,10 @@ Program:
   height=200 # you can even do this!
   cool_number = Program.width # you can even use references!
   # local references (such as just using .width) are planned
-  things_i_have_to_buy = ("apples", "200 tons of uranium")
+  things_i_have_to_buy = (
+    "apples",
+    "200 tons of uranium" # Supports multiline tuples!
+  )
 ```
 ### How to write .idoc file
 
@@ -61,11 +64,12 @@ Which will generate the lib `libidoc.a`.
 After setting it up, you start the parser, and get fields like so (lets use the idoc file defined in the example above):
 
 ```c main.c
-char *name = idoc_get(&idoc, cstr, "Program", "Name");
-double red[3]
-if (!idoc_tuple_get(&idoc, double, red, "program", "COLORS", "red") exit(1);
+Idoc *idoc = idoc_init("path/to/file.idoc")
+char *name = idoc_get(idoc, cstr, "Program", "Name");
+double red[3];
+if (!idoc_tuple_get(idoc, double, red, "program", "COLORS", "red") exit(1);
 // Other idoc_get methods ...
-idoc_free(&idoc);
+idoc_free(idoc);
 // Your program here that uses `name` and `red`
 // ...
 free(red);
