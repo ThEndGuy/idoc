@@ -25,6 +25,11 @@
 #include <ctype.h>
 #include <assert.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#include <io.h>
+#endif // _WIN32
+
 // This is the main structure you work with
 typedef struct Idoc Idoc;
 
@@ -335,8 +340,43 @@ struct Idoc {
     Idoc_SB __file_content;
 };
 
+// Necessary for _wfopen
+#ifdef _WIN32
+wchar_t *idoc_utf8_to_wide(const char *utf8) {
+    if (utf8 == NULL) return NULL;
+    // get size
+    int size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, utf8, -1, NULL, 0);
+    if (size <= 0) return NULL;
+    wchar_t *wide = malloc((size_t)size * sizeof(wchar_t));
+    if (wide == NULL) return NULL;
+
+    int result = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, utf8, -1, wide, size);
+    if (result <= 0) {
+        free(wide);
+        return NULL;
+    }
+    return wide;
+}
+#endif // _WIN32
+
+
 bool idoc_read_entire_file(const char *path, Idoc_SB *sb) {
-    FILE *f = fopen(path, "rb");
+    FILE *f = NULL;
+
+#ifdef _WIN32
+    wchar_t *wide_path = idoc_utf8_to_wide(path);
+    if (wide_path == NULL) {
+        fprintf(stderr,
+                "Could not convert file path from UTF-8 to UTF-16: %s\n", path);
+        return false;
+    }
+    f = _wfopen(wide_path, L"rb");
+    free(wide_path);
+
+#else
+    f = fopen(path, "rb");
+#endif
+
     if (!f) {
         fprintf(stderr, "Could not open %s: %s\n",
                 path, strerror(errno));
@@ -344,17 +384,27 @@ bool idoc_read_entire_file(const char *path, Idoc_SB *sb) {
     }
 
     if (fseek(f, 0, SEEK_END) != 0) {
+        fprintf(stderr, "Could not read file %s: %s\n",
+                path, strerror(errno));
         fclose(f);
         return false;
     }
 
-    long size = ftell(f);
+#ifndef _WIN32
+    long long size = ftell(f);
+#else
+    long long size = _telli64(_fileno(f));
+#endif
     if (size < 0) {
+        fprintf(stderr, "Could not read file %s: %s\n",
+                path, strerror(errno));
         fclose(f);
         return false;
     }
 
     if (fseek(f, 0, SEEK_SET) != 0) {
+        fprintf(stderr, "Could not read file %s: %s\n",
+                path, strerror(errno));
         fclose(f);
         return false;
     }
