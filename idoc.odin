@@ -2,17 +2,17 @@ package idoc
 
 import "core:fmt"
 import "core:c"
+import "core:c/libc"
 import "core:os"
 import "core:strings"
 
-foreign import libc "system:c"
-foreign libc {
-    @(link_name="free")
-    @(private)
-    cfree :: proc(ptr: rawptr) ---
-}
 
-foreign import idoc_lib "libidoc.a"
+
+when ODIN_OS == .Linux {
+    foreign import idoc_lib "libidoc.a"
+} else when ODIN_OS == .Windows {
+    foreign import idoc_lib "idoc.lib"
+}
 
 
 Idoc :: struct {}
@@ -59,7 +59,7 @@ get_string :: proc(idoc: ^Idoc,  path: ..cstring, def_str: string = "") -> (resu
     def_cstr := strings.clone_to_cstring(def_str)
     defer delete(def_cstr)
     cstr := idoc_get_cstr_arr(idoc, def_cstr, &path[0], len(path))
-    defer cfree(rawptr(cstr))
+    defer libc.free(rawptr(cstr))
     return strings.clone_from_cstring(cstr)
 }
 
@@ -104,7 +104,7 @@ get_tuple_string :: proc(idoc: ^Idoc, size: i32, path: ..cstring) -> (result: []
     }
     for cstr, i in src {
         tuple[i] = strings.clone_from_cstring(cstr)
-        cfree(rawptr(cstr))
+        libc.free(rawptr(cstr))
     }
     delete(src)
     return tuple, true

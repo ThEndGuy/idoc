@@ -93,6 +93,9 @@ bool   idoc_get_tuple_cstr(Idoc *idoc, char **out, size_t out_size, ...);
 // free the whole object. Don't forget that idoc_get_cstr doesnt get freed here!!
 void idoc_free(Idoc *idoc);
 
+
+void idoc_free_cstr(char *cstr);
+
 #define IDOC_ARRAY_LEN(arr) (sizeof(arr) / sizeof((arr)[0]))
 // For the convinience of the user, there are macros provided using the syntax
 // idoc_get(&idoc, TYPE, DEFAULT, ...);
@@ -1390,6 +1393,10 @@ void idoc_free(Idoc *idoc) {
     node_free(&idoc->root);
     free(idoc->__file_content.items);
     free(idoc);
+}
+
+void idoc_free_cstr(char *cstr) {
+    free(cstr);
 }
 
 
